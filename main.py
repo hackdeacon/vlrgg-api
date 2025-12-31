@@ -1,9 +1,9 @@
 import logging
-import os
+import re
 
 import uvicorn
 from fastapi import FastAPI
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -30,6 +30,18 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 @app.get("/favicon.ico", include_in_schema=False)
 def favicon():
     return FileResponse("static/favicon.svg")
+
+
+# 中间件：替换 Swagger UI 中的 fastapi favicon
+@app.middleware("html")
+async def replace_faviconMiddleware(request, call_next):
+    response = await call_next(request)
+    if hasattr(response, "body") and b"fastapi.tiangolo.com/img/favicon.png" in response.body:
+        response.body = response.body.replace(
+            b"https://fastapi.tiangolo.com/img/favicon.png",
+            b"/favicon.svg"
+        )
+    return response
 
 
 limiter = Limiter(key_func=get_remote_address)
