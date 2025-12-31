@@ -19,6 +19,7 @@ app = FastAPI(
     docs_url="/",
     redoc_url=None,
     favicon_url="/static/favicon.svg",
+    swagger_ui_parameters={"faviconUrl": "/static/favicon.svg"},
 )
 
 # 静态文件服务（用于 favicon）
