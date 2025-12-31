@@ -33,6 +33,11 @@ def favicon():
 
 
 # 中间件：替换 Swagger UI 中的 fastapi favicon 和标题
+SYSTEM_FONTS_CSS = b"""
+<style>
+    * { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important; }
+</style>
+"""
 @app.middleware("html")
 async def replace_faviconMiddleware(request, call_next):
     response = await call_next(request)
@@ -48,6 +53,8 @@ async def replace_faviconMiddleware(request, call_next):
             b"Valorant Esports API - Swagger UI",
             b"Valorant Esports API"
         )
+        # 注入系统字体样式
+        body = body.replace(b"</head>", SYSTEM_FONTS_CSS + b"</head>")
         response.body = body
     return response
 
