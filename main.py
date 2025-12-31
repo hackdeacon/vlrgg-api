@@ -8,6 +8,8 @@ from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
 
 from routers.vlr_router import router as vlr_router
 
@@ -22,6 +24,61 @@ app = FastAPI(
     swagger_ui_parameters={"faviconUrl": "/favicon.svg"},
 )
 
+
+# 中间件：替换 Swagger UI 中的 fastapi favicon 和标题，注入系统字体
+SYSTEM_FONTS_CSS = b"""
+<style>
+    * { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important; }
+</style>
+"""
+
+class CustomHTMLMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+
+        # 只处理 HTML 响应
+        content_type = response.headers.get("content-type", "")
+        if "text/html" in content_type:
+            # 读取响应体
+            body = b""
+            async for chunk in response.body_iterator:
+                body += chunk
+
+            logger.info(f"Processing HTML response for {request.url.path}")
+
+            # 替换 favicon
+            if b"fastapi.tiangolo.com/img/favicon.png" in body:
+                body = body.replace(
+                    b"https://fastapi.tiangolo.com/img/favicon.png",
+                    b"/favicon.svg"
+                )
+                logger.info("Replaced favicon URL")
+
+            # 去掉标题中的 " - Swagger UI"
+            if b"Valorant Esports API - Swagger UI" in body:
+                body = body.replace(
+                    b"Valorant Esports API - Swagger UI",
+                    b"Valorant Esports API"
+                )
+                logger.info("Replaced page title")
+
+            # 注入系统字体样式
+            if b"</head>" in body:
+                body = body.replace(b"</head>", SYSTEM_FONTS_CSS + b"</head>")
+                logger.info("Injected system fonts CSS")
+
+            # 创建新的响应
+            return Response(
+                content=body,
+                status_code=response.status_code,
+                headers=dict(response.headers),
+                media_type=response.media_type
+            )
+
+        return response
+
+app.add_middleware(CustomHTMLMiddleware)
+
 # 静态文件服务
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -30,33 +87,6 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 @app.get("/favicon.ico", include_in_schema=False)
 def favicon():
     return FileResponse("static/favicon.svg")
-
-
-# 中间件：替换 Swagger UI 中的 fastapi favicon 和标题
-SYSTEM_FONTS_CSS = b"""
-<style>
-    * { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important; }
-</style>
-"""
-@app.middleware("html")
-async def replace_faviconMiddleware(request, call_next):
-    response = await call_next(request)
-    if hasattr(response, "body"):
-        body = response.body
-        if b"fastapi.tiangolo.com/img/favicon.png" in body:
-            body = body.replace(
-                b"https://fastapi.tiangolo.com/img/favicon.png",
-                b"/favicon.svg"
-            )
-        # 去掉标题中的 " - Swagger UI"
-        body = body.replace(
-            b"Valorant Esports API - Swagger UI",
-            b"Valorant Esports API"
-        )
-        # 注入系统字体样式
-        body = body.replace(b"</head>", SYSTEM_FONTS_CSS + b"</head>")
-        response.body = body
-    return response
 
 
 limiter = Limiter(key_func=get_remote_address)
