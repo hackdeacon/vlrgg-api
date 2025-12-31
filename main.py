@@ -3,6 +3,7 @@ import logging
 import uvicorn
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
@@ -13,11 +14,15 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
-    title="vlrggapi",
+    title="Valorant Esports API",
     description="An Unofficial REST API for [vlr.gg](https://www.vlr.gg/), a site for Valorant Esports match and news coverage. Made by [axsddlr](https://github.com/axsddlr)",
     docs_url="/",
     redoc_url=None,
+    favicon_url="/static/favicon.svg",
 )
+
+# 静态文件服务（用于 favicon）
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
 limiter = Limiter(key_func=get_remote_address)
