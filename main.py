@@ -1,8 +1,9 @@
 import logging
+import os
 
 import uvicorn
 from fastapi import FastAPI
-from fastapi.responses import RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -18,12 +19,17 @@ app = FastAPI(
     description="An Unofficial REST API for [vlr.gg](https://www.vlr.gg/), a site for Valorant Esports match and news coverage. Made by [axsddlr](https://github.com/axsddlr)",
     docs_url="/",
     redoc_url=None,
-    favicon_url="/static/favicon.svg",
-    swagger_ui_parameters={"faviconUrl": "/static/favicon.svg"},
+    swagger_ui_parameters={"faviconUrl": "/favicon.svg"},
 )
 
-# 静态文件服务（用于 favicon）
+# 静态文件服务
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+
+@app.get("/favicon.svg", include_in_schema=False)
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    return FileResponse("static/favicon.svg")
 
 
 limiter = Limiter(key_func=get_remote_address)
