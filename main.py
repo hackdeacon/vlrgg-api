@@ -32,15 +32,23 @@ def favicon():
     return FileResponse("static/favicon.svg")
 
 
-# 中间件：替换 Swagger UI 中的 fastapi favicon
+# 中间件：替换 Swagger UI 中的 fastapi favicon 和标题
 @app.middleware("html")
 async def replace_faviconMiddleware(request, call_next):
     response = await call_next(request)
-    if hasattr(response, "body") and b"fastapi.tiangolo.com/img/favicon.png" in response.body:
-        response.body = response.body.replace(
-            b"https://fastapi.tiangolo.com/img/favicon.png",
-            b"/favicon.svg"
+    if hasattr(response, "body"):
+        body = response.body
+        if b"fastapi.tiangolo.com/img/favicon.png" in body:
+            body = body.replace(
+                b"https://fastapi.tiangolo.com/img/favicon.png",
+                b"/favicon.svg"
+            )
+        # 去掉标题中的 " - Swagger UI"
+        body = body.replace(
+            b"Valorant Esports API - Swagger UI",
+            b"Valorant Esports API"
         )
+        response.body = body
     return response
 
 
