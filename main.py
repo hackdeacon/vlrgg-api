@@ -28,7 +28,12 @@ app = FastAPI(
 # 中间件：替换 Swagger UI 中的 fastapi favicon 和标题，注入系统字体
 SYSTEM_FONTS_CSS = b"""
 <style>
-    * { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important; }
+    body, body *, .swagger-ui, .swagger-ui *, .renderedMarkdown, .renderedMarkdown * {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+    }
+    code, code *, pre, pre *, .monospace, .monospace *, .microlight, .microlight *, textarea, input[type="text"] {
+        font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace !important;
+    }
 </style>
 """
 
@@ -39,41 +44,49 @@ class CustomHTMLMiddleware(BaseHTTPMiddleware):
         # 只处理 HTML 响应
         content_type = response.headers.get("content-type", "")
         if "text/html" in content_type:
-            # 读取响应体
-            body = b""
-            async for chunk in response.body_iterator:
-                body += chunk
+            try:
+                # 读取响应体
+                body = b""
+                async for chunk in response.body_iterator:
+                    body += chunk
 
-            logger.info(f"Processing HTML response for {request.url.path}")
+                logger.info(f"Processing HTML response for {request.url.path}")
 
-            # 替换 favicon
-            if b"fastapi.tiangolo.com/img/favicon.png" in body:
-                body = body.replace(
-                    b"https://fastapi.tiangolo.com/img/favicon.png",
-                    b"/favicon.svg"
+                # 替换 favicon
+                if b"fastapi.tiangolo.com/img/favicon.png" in body:
+                    body = body.replace(
+                        b"https://fastapi.tiangolo.com/img/favicon.png",
+                        b"/favicon.svg"
+                    )
+                    logger.info("Replaced favicon URL")
+
+                # 去掉标题中的 " - Swagger UI"
+                if b"Valorant Esports API - Swagger UI" in body:
+                    body = body.replace(
+                        b"Valorant Esports API - Swagger UI",
+                        b"Valorant Esports API"
+                    )
+                    logger.info("Replaced page title")
+
+                # 注入系统字体样式
+                if b"</head>" in body:
+                    body = body.replace(b"</head>", SYSTEM_FONTS_CSS + b"</head>")
+                    logger.info("Injected system fonts CSS")
+
+                # 更新 Content-Length header
+                headers = dict(response.headers)
+                headers["content-length"] = str(len(body))
+
+                # 创建新的响应
+                return Response(
+                    content=body,
+                    status_code=response.status_code,
+                    headers=headers,
+                    media_type=response.media_type
                 )
-                logger.info("Replaced favicon URL")
-
-            # 去掉标题中的 " - Swagger UI"
-            if b"Valorant Esports API - Swagger UI" in body:
-                body = body.replace(
-                    b"Valorant Esports API - Swagger UI",
-                    b"Valorant Esports API"
-                )
-                logger.info("Replaced page title")
-
-            # 注入系统字体样式
-            if b"</head>" in body:
-                body = body.replace(b"</head>", SYSTEM_FONTS_CSS + b"</head>")
-                logger.info("Injected system fonts CSS")
-
-            # 创建新的响应
-            return Response(
-                content=body,
-                status_code=response.status_code,
-                headers=dict(response.headers),
-                media_type=response.media_type
-            )
+            except Exception as e:
+                logger.error(f"Error processing HTML: {e}")
+                return response
 
         return response
 
